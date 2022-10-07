@@ -1,0 +1,7 @@
+var top = "hello tom brady"
+
+print "Hello i am Brendan"
+
+ --- This is a comment
+
+func Hello()
