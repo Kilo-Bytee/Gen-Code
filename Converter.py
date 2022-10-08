@@ -1,93 +1,108 @@
 import Collector
+import json as js
 
 class run():
-    def __init__(self,file):
-        if not file.endswith(".gen"):
-            print("Error: Incorrect file type")
-            exit()
+    ful_ignore = False
+    def __init__(self,file,typ="file"):
+        keywords = None
+        if typ == "file":
+            if not file.endswith(".gen"):
+                print("Error: Incorrect file type")
+                exit()
+            else:
+                keywords = Collector.collect(file)
+                Define_Functions(keywords)
 
-        keywords = Collector.collect(file)
+        elif typ == "func":
+            keywords = file
 
-        run.Clear_Var()
-        Define_Functions(keywords)
-
+        Func_Names = Define_Functions.Get_Names()
         type = None
-
         for line in keywords:
-            ignore = False
+
             for i in line:
+                
                 if i == "":
                     line.remove(i)
                 
                 if i.startswith("---"):
-                    ignore = True
+                    run.ful_ignore = True
+                elif i == "func":
+                    run.ful_ignore = True
+                elif i == "end":
+                    run.ful_ignore = False
 
-                if ignore == False:
+                if run.ful_ignore == False:
                     if i == "print":
                         type = "PRINT"
                     elif i == "var":
                         type = "VARIABLE"
+                    elif i in Func_Names:
+                        Func = Define_Functions.Get_Func(i)
+                        run(Func,"func")
 
-            if type == "PRINT":
-                if i.startswith("\""):
-                    run.Print(line,"str")
-                    type = None
-                elif i.isdigit():
-                    run.Print(line,"num")
-                    type = None
-                else:
-                    run.Print(line,"var")
-                    type = None
+            if run.ful_ignore == False:
+                if type == "PRINT":
+                    if i.startswith("\""):
+                        run.Print(line,"str")
+                        type = None
+                    elif i.isdigit():
+                        run.Print(line,"num")
+                        type = None
+                    else:
+                        run.Print(line,"var")
+                        type = None
 
-            elif type == "VARIABLE":
-                run.Create_Var(line)
+                elif type == "VARIABLE":
+                    run.Create_Var(line)
+                    type = None
+            else:
                 type = None
 
-            elif type == "FUNCTION":
-                pass
 
     def Print(args,type):
         sign = ""
         result = None
         args.remove("print")
-        if type == "num":
-            for i in args:
-                if i == "+" or i == "-" or i == "/" or i =="*":
-                    sign = i
+        if run.ful_ignore == False:
+            if type == "num":
+                for i in args:
+                    if i == "+" or i == "-" or i == "/" or i =="*":
+                        sign = i
+                    try:
+                        num = int(i)
+                        if sign == "":
+                            result = num
+                        else:
+                            if sign == "+":
+                                result += num
+                            elif sign == "-":
+                                result -= num
+                            elif sign == "*":
+                                result *= num
+                            elif sign == "/":
+                                result /= num
+                    except:
+                        print("error")
+            elif type == "var":
                 try:
-                    num = int(i)
-                    if sign == "":
-                        result = num
-                    else:
-                        if sign == "+":
-                            result += num
-                        elif sign == "-":
-                            result -= num
-                        elif sign == "*":
-                            result *= num
-                        elif sign == "/":
-                            result /= num
+                    result = run.Get_Var(args[0])
                 except:
-                    print("error")
-        elif type == "var":
-            try:
-                result = run.Get_Var(args[0])
-            except:
-                pass
+                    pass
 
-        if type == "num" or type == "var":
-            if result != None:
-                print(result)
-        elif type == "str":
-            string = ''
-            for i in args:
-                if i.startswith("\""):
-                    i = i[1:]
-                if i.endswith("\""):
-                    i = i[:-1]
-                
-                string += (i+" ")
-            print(string)
+            if type == "num" or type == "var":
+                if result != None:
+                    print(result)
+            elif type == "str":
+                string = ''
+                for i in args:
+                    if i.startswith("\""):
+                        i = i[1:]
+                    if i.endswith("\""):
+                        i = i[:-1]
+
+                    string += (i+" ")
+                print(string)
 
     def Create_Var(args):
         file = open("vars.txt","a")
@@ -126,22 +141,63 @@ class run():
     def Remove_Marks(i):
         if i.startswith("\""):
             i = i[1:]
+
         if i.endswith("\""):
             i = i[:-1]
         return i 
 
-    def Clear_Var():
+    def Clear():
         file = open("vars.txt","w")
+        file.close()
+        file = open("functions.json","w")
+        file.write("[]")
         file.close()
 
 class Define_Functions():
     def __init__(self,Lines):
+        function = False
+        func_lines = []
+        Name = ""
         for line in Lines:
-            print(line)
             try:
+                if function == True:
+                    func_lines.append(line)
+                    
                 if line[0] == "func":
-                    print("Function detected",line[1])
+                    Name = line[1]
+                    function = True
+                elif line[0] == "end":
+                    function = False
+                    Define_Functions.Save(func_lines,Name)
+                    Name = ""
+                    func_lines = []
             except:
                 pass
 
+    def Save(args,Name):
+        red = open("functions.json","r").read()
+        red = js.loads(red)
+        content = open("functions.json","w")
+        content_text = [Name,args]
+        red.append(content_text)
+        content.write(js.dumps(red))
+        content.close()
+
+    def Get_Names():
+        content = open("functions.json","r").read()
+        content = js.loads(content)
+        Names = []
+        for i in content:
+            Names.append(i[0])
+
+        return Names
+
+    def Get_Func(Name):
+        content = open("functions.json","r").read()
+        content = js.loads(content)
+        for i in content:
+            if i[0] == Name:
+                return i[1]
+
+run.Clear()
 run("Test.gen")

@@ -1,7 +1,12 @@
-var top = "hello tom brady"
-
-print "Hello i am Brendan"
-
- --- This is a comment
+var Variable = 2
 
 func Hello()
+    print "This is a tik tok"
+    print "hello"
+end
+
+func Test()
+    print Variable
+end
+
+Test()
