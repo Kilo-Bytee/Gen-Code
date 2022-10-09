@@ -1,12 +1,14 @@
-var Variable = 2
+var Time = TRUE
 
 func Hello()
     print "This is a tik tok"
-    print "hello"
-end
-
-func Test()
     print Variable
 end
 
-Test()
+if Time = TRUE then
+    print "works"
+else
+    print "no"
+endif
+
+print Time
