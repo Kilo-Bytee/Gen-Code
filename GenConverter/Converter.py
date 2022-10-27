@@ -1,5 +1,13 @@
-from fileinput import isfirstline
-import Collector
+import os
+from symbol import func_type
+import sys
+
+dirname = os.path.dirname(__file__).split("\GenConverter")
+dirname = dirname[0]
+
+sys.path.insert(1,dirname)
+
+import GenConverter.Collector as Collector
 import json as js
 
 class run():
@@ -9,6 +17,7 @@ class run():
     def __init__(self,file,typ="file"):
         keywords = None
         if typ == "file":
+            run.Clear()
             if not file.endswith(".gen"):
                 print("Error: Incorrect file type")
                 exit()
@@ -23,34 +32,36 @@ class run():
         run.Func_Names = Define_Functions.Get_Names()
         type = None
         for line in keywords:
-
             for i in line:
-                
+                ignore = False
                 if i == "":
                     line.remove(i)
                 
-                if i.startswith("---"):
-                    type = "COMMENT"
+                if i.startswith("##"):
+                    ignore = True
                 elif i == "func":
                     run.ful_ignore = True
                 elif i == "end":
                     run.ful_ignore = False
                 elif i == "endif":
                     run.ful_ignore = False
-
-                if run.ful_ignore == False:
+                func_test = i[:-2]
+                if run.ful_ignore == False and ignore == False:
                     if i == "print":
                         type = "PRINT"
                     elif i == "var":
                         type = "VARIABLE"
                     elif i == "if":
                         type = "IF"
-
-                    elif i in run.Func_Names:
-                        Func = Define_Functions.Get_Func(i)
+                    elif i in run.Func_Names.keys():
+                        Func = Define_Functions.Get_Func(line[0],line[1])
                         run(Func,"func")
 
-            if run.ful_ignore == False:
+                    if func_test in run.Func_Names["Global"]:
+                        Func = Define_Functions.Get_Func(func_test)
+                        run(Func,"func")
+
+            if run.ful_ignore == False and ignore == False:
                 if type == "PRINT":
                     if i.startswith("\""):
                         run.Print(line,"str")
@@ -70,8 +81,6 @@ class run():
                     If_Statement(line)
                     run.ful_ignore = True
                     type = None
-                elif type == "COMMENT":
-                    pass
             else:
                 type = None
 
@@ -120,10 +129,9 @@ class run():
                 print(string)
 
     def Create_Var(args):
-        file = open("vars.txt","a")
+        file = open(dirname+r"\GenConverter\Value\vars.txt","a")
         variable = ""
         typ = ""
-        print("Var",args)
         if args[len(args)-1].startswith("\""):
             typ = "str"
         elif not args[3].startswith("\"") and args[3].isdigit():
@@ -142,7 +150,7 @@ class run():
         file.close()
 
     def Get_Var(var):
-        file = open("vars.txt","r").read()
+        file = open(dirname+r"\GenConverter\Value\vars.txt","r").read()
         vars = file.splitlines()
         result = ""
         typ = ""
@@ -163,7 +171,6 @@ class run():
                 typ = q[2]
         result = result[:-4]
         if found == False:
-            print(var)
             print("Error: No variable named: "+var)
 
         return result, typ
@@ -177,9 +184,9 @@ class run():
         return i 
 
     def Clear():
-        file = open("vars.txt","w")
+        file = open(dirname+r"\GenConverter\Value\vars.txt","w")
         file.close()
-        file = open("functions.json","w")
+        file = open(dirname+r"\GenConverter\Value\functions.json","w")
         file.write("[]")
         file.close()
 
@@ -220,22 +227,24 @@ class If_Statement():
         run(Lines,"func")
 
     def Question(args):
-        print(args)
-        if not args[1].startswith("\"") and not args[1].isdigit() and not args[1] == "TRUE" or not args[1] == "FALSE":
-            if args[1] != "TRUE" and args[1] != "FALSE":
-                args[1],typ = run.Get_Var(args[1])
-
-        if not args[3].startswith("\"") and not args[3].isdigit():
-            if args[3] != "TRUE" and args[3] != "FALSE":
-                args[3],typ = run.Get_Var(args[3])
-
         Ans = True
         i = 1
         while(i < len(args)):
+            if not args[i].startswith("\"") and not args[i].isdigit():
+                if args[i] != "TRUE" and args[i] != "FALSE":
+                    args[i],typ = run.Get_Var(args[i])
+                    if typ == "str":
+                        args[i] = "\""+args[i]+"\""
+
+            if not args[i+2].startswith("\"") and not args[i+2].isdigit():
+                if args[i+2] != "TRUE" and args[i+2] != "FALSE":
+                    args[i+2],typ = run.Get_Var(args[i+2])
+                    if typ == "str":
+                        args[i+2] = "\""+args[i+2]+"\""
+
             if args[i+1] == "=":
                 if not args[i] == args[i+2]:
                     Ans = False
-                    print(args)
 
             elif args[i+1] == ">":
                 if args[i].isdigit() and args[i+2].isdigit:
@@ -265,6 +274,7 @@ class Define_Functions():
         function = False
         func_lines = []
         Name = ""
+        Module = None
         for line in Lines:
             try:
                 if function == True:
@@ -272,42 +282,93 @@ class Define_Functions():
                     
                 if line[0] == "func":
                     Name = line[1]
-                    function = True
+                    nam = ""
+                    e = False
+                    if not Name.endswith(")"):
+                        print("Function:",Name,"Is inputed wrong")
+                    else:
+                        function = True
+
+                    for i in Name:
+                        if e == False:
+                            if i != "(":
+                                nam+=i
+                            else:
+                                e = True
+                                Name = nam
                 elif line[0] == "end":
-                    function = False
-                    Define_Functions.Save(func_lines,Name)
-                    Name = ""
-                    func_lines = []
+                    if function == True:
+                        function = False
+                        Define_Functions.Save(func_lines,Name,Module)
+                        Name = ""
+                        func_lines = []
+                elif line[0] == "mod":
+                    Module = line[1][:-1]
+                elif line[0] == "]":
+                    Module = None
             except:
                 pass
 
-    def Save(args,Name):
-        red = open("functions.json","r").read()
+    def Save(args,Name,Module):
+
+        red = open(dirname+r"\GenConverter\Value\functions.json","r").read()
         red = js.loads(red)
-
-        content = open("functions.json","w")
-
         content_text = [Name,args]
-        red.append(content_text)
+
         
+        if red == []:
+            red.append({"Global":[]})
+
+        f = False
+        for i in red[0]:
+            if i[0] == Module:
+                i.append(content_text)
+                f = True
+
+        if f == False and Module == None:
+            t = red[0]
+            t["Global"].append(content_text)
+            
+        elif f == False and Module != None:
+            t = red[0]
+            t.update({Module:[]})
+            
+            Mod = t[Module]
+            Mod.append(content_text)
+        
+        content = open(dirname+r"\GenConverter\Value\functions.json","w")
         content.write(js.dumps(red))
         content.close()
 
     def Get_Names():
-        content = open("functions.json","r").read()
+        content = open(dirname+r"\GenConverter\Value\functions.json","r").read()
         content = js.loads(content)
-        Names = []
-        for i in content:
-            Names.append(i[0])
+        content = content[0]
+        Names = {}
+        for i,v in content.items():
+            current = []
+            for func in v:
+                current.append(func[0])
+            
+            Names.update({i:current})
+
 
         return Names
 
-    def Get_Func(Name):
-        content = open("functions.json","r").read()
+    def Get_Func(Module,Name=None):
+        content = open(dirname+r"\GenConverter\Value\functions.json","r").read()
         content = js.loads(content)
-        for i in content:
-            if i[0] == Name:
-                return i[1]
-
-run.Clear()
-run("Test.gen")
+        func = None
+        if Name == None:
+            t = content[0]
+            for i in t["Global"]:
+                if i[0] == Module:
+                    func = i[1]
+        else:
+            t = content[0]
+            Name = Name[:-2]
+            for i in t[Module]:
+                if i[0] == Name:
+                    func = i[1]
+        
+        return func

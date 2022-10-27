@@ -3,6 +3,7 @@ def collect(file):
     file = open(file,"r").read()
     file +=" "
     lines = file.splitlines()
+    type = ""
     for t in lines:
         if not t.endswith(" "):
             t+=" "
@@ -17,6 +18,13 @@ def collect(file):
             elif i == "\"":
                 if word != "":
                     line.append("\""+word+"\"")
+                    word = ""
+                    type = ""
+                else:
+                    type = "string"
+            elif i == ".":
+                if type == "":
+                    line.append(word)
                     word = ""
             else:
                 word+=i
