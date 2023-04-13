@@ -27,7 +27,8 @@ def collect(file):
                     line.append(word)
                     word = ""
             else:
-                word+=i
-        
-        words.append(line)
+                if i != "	":
+                    word+=i
+        if line != []:
+            words.append(line)
     return words

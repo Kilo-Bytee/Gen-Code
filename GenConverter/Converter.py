@@ -1,6 +1,7 @@
 import os
-from symbol import func_type
 import sys
+import importlib
+import importlib.util
 
 dirname = os.path.dirname(__file__).split("\GenConverter")
 dirname = dirname[0]
@@ -11,7 +12,7 @@ import GenConverter.Collector as Collector
 import json as js
 
 class run():
-    Func_Names = None
+    Func_Names = []
     ful_ignore = False
     file = []
     def __init__(self,file,typ="file"):
@@ -28,8 +29,11 @@ class run():
 
         elif typ == "func":
             keywords = file
-
-        run.Func_Names = Define_Functions.Get_Names()
+        
+        try:
+            run.Func_Names = Define_Functions.Get_Names()
+        except:
+            pass
         type = None
         for line in keywords:
             for i in line:
@@ -45,7 +49,7 @@ class run():
                     run.ful_ignore = False
                 elif i == "endif":
                     run.ful_ignore = False
-                func_test = i[:-2]
+
                 if run.ful_ignore == False and ignore == False:
                     if i == "print":
                         type = "PRINT"
@@ -53,13 +57,19 @@ class run():
                         type = "VARIABLE"
                     elif i == "if":
                         type = "IF"
-                    elif i in run.Func_Names.keys():
-                        Func = Define_Functions.Get_Func(line[0],line[1])
-                        run(Func,"func")
-
-                    if func_test in run.Func_Names["Global"]:
-                        Func = Define_Functions.Get_Func(func_test)
-                        run(Func,"func")
+                    elif i == "use":
+                        type = "IMPORT"
+            p = line[0]
+            func_test = p[:-2]
+            try:
+                if line[0] in run.Func_Names.keys():
+                    Func = Define_Functions.Get_Func(line[0],line[1])
+                    run(Func,"func")
+                elif func_test in run.Func_Names["Global"]:
+                    Func = Define_Functions.Get_Func(func_test)
+                    run(Func,"func")
+            except:
+                pass
 
             if run.ful_ignore == False and ignore == False:
                 if type == "PRINT":
@@ -80,6 +90,10 @@ class run():
                 elif type == "IF":
                     If_Statement(line)
                     run.ful_ignore = True
+                    type = None
+
+                elif type == "IMPORT":
+                    Import(line)
                     type = None
             else:
                 type = None
@@ -246,6 +260,10 @@ class If_Statement():
                 if not args[i] == args[i+2]:
                     Ans = False
 
+            if args[i+1] == "!=":
+                if not args[i] != args[i+2]:
+                    Ans = False
+
             elif args[i+1] == ">":
                 if args[i].isdigit() and args[i+2].isdigit:
                     if not args[i] > args[i+2]:
@@ -302,7 +320,7 @@ class Define_Functions():
                         Define_Functions.Save(func_lines,Name,Module)
                         Name = ""
                         func_lines = []
-                elif line[0] == "mod":
+                elif line[0] == "Module":
                     Module = line[1][:-1]
                 elif line[0] == "]":
                     Module = None
@@ -313,6 +331,7 @@ class Define_Functions():
 
         red = open(dirname+r"\GenConverter\Value\functions.json","r").read()
         red = js.loads(red)
+        
         content_text = [Name,args]
 
         
@@ -320,9 +339,10 @@ class Define_Functions():
             red.append({"Global":[]})
 
         f = False
-        for i in red[0]:
-            if i[0] == Module:
-                i.append(content_text)
+        for i in red[0].keys():
+            if i == Module:
+                t = red[0]
+                t[i].append(content_text)
                 f = True
 
         if f == False and Module == None:
@@ -352,7 +372,6 @@ class Define_Functions():
             
             Names.update({i:current})
 
-
         return Names
 
     def Get_Func(Module,Name=None):
@@ -372,3 +391,16 @@ class Define_Functions():
                     func = i[1]
         
         return func
+
+class Import():
+    def __init__(self,line):
+        Name = line[1]+".py"
+        
+        files = os.listdir(dirname+r"\GenConverter\Modules")
+
+        if Name in files:
+            Loc = dirname+r"\GenConverter\Modules"
+            Spec = importlib.util.spec_from_file_location(Loc,Loc+"\\"+Name)
+            Module = Spec.loader.load_module()
+        else:
+            raise TypeError("No module called: "+line[1])
